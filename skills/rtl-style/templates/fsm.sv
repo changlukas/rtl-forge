@@ -1,8 +1,8 @@
 // ============================================================================
-// Three-process FSM Template
-// 第一段：時序（state register）
-// 第二段：組合（next state logic）
-// 第三段：組合（output logic）
+// Three-process FSM template
+//   Process 1 (sequential)  : state register
+//   Process 2 (combinational): next-state logic
+//   Process 3 (combinational): output logic (Moore)
 // ============================================================================
 
 module fsm_example (
@@ -49,7 +49,7 @@ module fsm_example (
     end
 
     // ========================================================================
-    // Process 2: Next State Logic (combinational)
+    // Process 2: Next-State Logic (combinational)
     // ========================================================================
     always_comb begin
         // Default: stay in current state

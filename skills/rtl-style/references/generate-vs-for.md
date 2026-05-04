@@ -1,29 +1,27 @@
-# Generate vs For 循環
+# Generate vs For
 
-主文件對應章節：`rtl_style.md` §5.5
+## Decision rule
 
-## 鐵則
+| Use case | Use |
+|----------|-----|
+| Parallel hardware instances | **`generate`** |
+| Tree structures (adder tree, XOR tree) | **`generate`** |
+| Repeated register/logic arrays | **`generate`** |
+| Conditional hardware | **`generate if`** |
+| Testbench iteration | `for` |
+| `initial` block init | `for` |
+| Function-internal accumulation | `for` (sparingly) |
 
-| 用途 | 用法 |
-|------|------|
-| 創建並行硬體實例 | **`generate`** |
-| 樹狀結構（adder tree, XOR tree） | **`generate`** |
-| 重複的暫存器/邏輯陣列 | **`generate`** |
-| 條件性硬體生成 | **`generate if`** |
-| Testbench 測試迭代 | `for` |
-| `initial` 區塊初始化 | `for` |
-| Function 內簡單累加 | `for` (謹慎) |
+## Comparison
 
-## 對照表
+| Aspect | `generate` | `for` |
+|--------|-----------|-------|
+| Expansion | Elaboration time | Run time |
+| Result | Parallel hardware | Cascaded logic / iteration |
+| Synthesizable | ✓ Fully | ⚠️ Partially |
+| Timing | Parallel, no extra delay | Long combinational paths possible |
 
-| 特性 | `generate` | `for` |
-|------|-----------|-------|
-| 展開時機 | 編譯時 (elaboration) | 運行時 |
-| 產生結果 | 並行硬體實例 | 串聯邏輯或迭代 |
-| 可綜合性 | ✓ 完全可綜合 | ⚠️ 僅部分可綜合 |
-| 時序影響 | 並行，無額外延遲 | 可能產生長組合路徑 |
-
-## 正確：generate 創建並行實例
+## generate — parallel instances
 
 ```systemverilog
 module parallel_adders #(
@@ -43,7 +41,7 @@ module parallel_adders #(
 endmodule
 ```
 
-## 正確：generate 創建並行 FF 陣列
+## generate — parallel FF array
 
 ```systemverilog
 genvar i;
@@ -57,10 +55,10 @@ generate
 endgenerate
 ```
 
-## 正確：generate 建立加法器樹
+## generate — adder tree
 
 ```systemverilog
-// 16 → 8 → 4 → 2 → 1，並行 log2(N) 級
+// 16 → 8 → 4 → 2 → 1, log2(N) levels
 logic [8:0]  level1 [8];
 logic [9:0]  level2 [4];
 logic [10:0] level3 [2];
@@ -80,7 +78,7 @@ endgenerate
 assign sum_o = {1'b0, level3[0]} + {1'b0, level3[1]};
 ```
 
-## 正確：條件 generate
+## Conditional generate
 
 ```systemverilog
 generate
@@ -92,30 +90,26 @@ generate
 endgenerate
 ```
 
-## 錯誤：for 在 always 中產生硬體
+## Anti-pattern: for inside always (produces unintended hardware)
 
 ```systemverilog
-// ❌ 錯誤：可能產生意外的共享 counter
+// ❌ Shared-counter risk
 integer i;
 always_ff @(posedge clk_i) begin
-    for (i = 0; i < 8; i++) begin
-        data_o[i] <= data_i[i];
-    end
+    for (i = 0; i < 8; i++) data_o[i] <= data_i[i];
 end
 
-// ❌ 錯誤：8 級串聯加法（時序差）
+// ❌ 8-level cascaded adder
 always_comb begin
     sum = '0;
-    for (i = 0; i < 8; i++) begin
-        sum = sum + data[i];
-    end
+    for (i = 0; i < 8; i++) sum = sum + data[i];
 end
 ```
 
-## 錯誤：for 用整數比較選擇
+## Anti-pattern: for-loop selector
 
 ```systemverilog
-// ❌ 錯誤
+// ❌
 always_comb begin
     data_o = '0;
     for (i = 0; i < 8; i++) begin
@@ -123,10 +117,10 @@ always_comb begin
     end
 end
 
-// ✓ 正確 1：直接索引
+// ✓ Direct index
 assign data_o = data_i[sel_i];
 
-// ✓ 正確 2：case
+// ✓ Or case
 always_comb begin
     case (sel_i)
         3'd0: data_o = data_i[0];
@@ -137,18 +131,18 @@ always_comb begin
 end
 ```
 
-## Generate 命名規則
+## Generate naming (mandatory)
 
 ```systemverilog
-// 強制：generate 塊必須命名
+// All generate blocks must be named (waveform/back-trace requires it)
 genvar i;
 generate
-    for (i = 0; i < N; i++) begin : gen_units    // <- 必須命名
+    for (i = 0; i < N; i++) begin : gen_units    // <- required
         processing_unit u_unit ( ... );
     end
 endgenerate
 
-// 條件 generate 所有分支也要命名
+// All branches of conditional generate must be named
 generate
     if (COND) begin : gen_path_a
         // ...
@@ -158,7 +152,7 @@ generate
 endgenerate
 ```
 
-## 嵌套 Generate
+## Nested generate
 
 ```systemverilog
 // 2D mesh
@@ -173,5 +167,5 @@ generate
         end
     end
 endgenerate
-// 嵌套不超過 3 層
+// Cap nesting at 3 levels.
 ```

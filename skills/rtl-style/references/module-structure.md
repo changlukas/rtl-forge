@@ -1,14 +1,12 @@
-# 模組結構與 Port 對齊
+# Module Structure and Port Alignment
 
-主文件對應章節：`rtl_style.md` §3.4, §4
+## Port declaration order (mandatory)
 
-## Port 宣告順序（強制）
-
-1. 時鐘（clk）
-2. 重置（rst）
-3. 輸入信號（按功能分組）
-4. 輸出信號（按功能分組）
-5. 雙向信號（inout，盡量避免）
+1. Clock(s)
+2. Reset(s)
+3. Inputs (grouped by function)
+4. Outputs (grouped by function)
+5. Bidirectional (`inout`) — avoid
 
 ```systemverilog
 module example #(
@@ -36,9 +34,9 @@ module example #(
 );
 ```
 
-## Port 對齊（強制）
+## Port alignment (mandatory)
 
-類型、名稱、註解三欄對齊：
+Align direction, type/width, name in three columns:
 
 ```systemverilog
 module aligned_ports (
@@ -51,13 +49,15 @@ module aligned_ports (
 );
 ```
 
-## 參數化
+## Parameterization
+
+Use `parameter` for caller-overridable values, `localparam` for derived values that must not be overridden.
 
 ```systemverilog
 module parameterized_fifo #(
     parameter int DATA_WIDTH = 32,
     parameter int DEPTH      = 16,
-    // 衍生參數用 localparam 自動計算
+    // Derived — caller cannot override
     localparam int ADDR_WIDTH = $clog2(DEPTH)
 ) (
     input  logic                  clk_i,
@@ -74,9 +74,9 @@ module parameterized_fifo #(
 endmodule
 ```
 
-## 內部分區註解
+## Internal banner sections
 
-模組內部用 banner 註解區分：
+Inside the module body, separate concerns with banner comments:
 
 ```systemverilog
     // ========================================================================
@@ -118,10 +118,10 @@ endmodule
     );
 ```
 
-## Submodule 實例化（命名連接，禁止位置連接）
+## Submodule instantiation — named connections only
 
 ```systemverilog
-// ✓ 正確：named connection
+// ✓ Named connections
 fifo #(
     .DATA_WIDTH (32),
     .DEPTH      (16)
@@ -134,10 +134,51 @@ fifo #(
     .full_o  (fifo_full)
 );
 
-// ❌ 錯誤：位置連接
+// ❌ Positional — forbidden
 fifo u_fifo (clk_i, rst_ni, data, valid, ...);
 ```
 
-## 完整檔案模板
+## Continuous assignments (`assign`)
 
-直接使用 `templates/module.sv`。
+Use `assign` for simple combinational expressions. For multi-line conditions, break and align under the operator:
+
+```systemverilog
+// Simple
+assign sum       = a + b + c;
+assign is_valid  = req_valid && !fifo_full;
+assign next_addr = addr_q + INCREMENT;
+
+// Multi-line: each operand on its own line, operator-aligned
+assign complex_condition = (state_q == ACTIVE)        &&
+                           (counter_q < MAX_COUNT)    &&
+                           (!error_flag)              &&
+                           (data_valid_i);
+```
+
+If the expression is more than ~3 operands or has nested ternaries, move it into an `always_comb` block.
+
+## Assertion blocks (simulation-only)
+
+Wrap `property` / `assert property` / `cover` in tool pragmas so they don't enter synthesis. Both `synopsys translate_off/on` and `` `ifndef SYNTHESIS `` must guard the block — different tools honor different markers.
+
+```systemverilog
+// synopsys translate_off
+`ifndef SYNTHESIS
+
+property p_valid_stable;
+    @(posedge clk_i) disable iff (!rst_ni)
+    valid_o && !ready_i |=> $stable(result_o);
+endproperty
+
+assert property (p_valid_stable)
+    else $error("Result changed while valid is high");
+
+`endif
+// synopsys translate_on
+```
+
+Place assertions at the bottom of the module, after RTL and submodule instantiation.
+
+## Template
+
+`templates/module.sv`.

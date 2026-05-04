@@ -1,9 +1,22 @@
 // ============================================================================
-// Copyright (c) YYYY Company Name
-// File        : <module_name>.sv
-// Description : <一兩句話描述模組功能>
+// Module      : <module_name>
+//
+// Description :
+//   <One or two sentences describing the module's function.>
+//   <Optional bullet list of features:>
+//   - <feature 1>
+//   - <feature 2>
+//
+// Parameters  :
+//   PARAM_A : <description of parameter A>
+//   PARAM_B : <description of parameter B>
+//
+// Interfaces  :
+//   <bus_type> : <role and purpose, e.g. "AXI4 Master : memory access">
+//
 // Author      : <Author Name>
-// Created     : YYYY-MM-DD
+// Date        : YYYY-MM-DD
+// Version     : 1.0
 // ============================================================================
 
 `include "common_defines.svh"
@@ -13,7 +26,7 @@ module <module_name>
 #(
     parameter int PARAM_A = 32,
     parameter int PARAM_B = 64,
-    // 衍生參數（不可由外部覆寫）
+    // Derived parameters (not externally overridable)
     localparam int INTERNAL_WIDTH = PARAM_A + PARAM_B
 ) (
     // ========================================================================

@@ -1,66 +1,64 @@
-# 禁止使用的寫法
+# Forbidden Patterns
 
-主文件對應章節：`rtl_style.md` §7
-
-## 1. 混合阻塞與非阻塞賦值
+## 1. Mixing blocking and non-blocking assignments
 
 ```systemverilog
-// ❌ 嚴重錯誤
+// ❌ Severe — race condition
 always_ff @(posedge clk_i) begin
-    a <= b;        // 非阻塞
-    c = a + 1;     // 阻塞 — 行為不可預測
+    a <= b;        // non-blocking
+    c = a + 1;     // blocking — undefined behavior
 end
 
-// ✓ 時序邏輯只用 <=
+// ✓ Sequential logic uses <= only
 always_ff @(posedge clk_i) begin
     a <= b;
     c <= a + 1'b1;
 end
 
-// ✓ 組合邏輯只用 =
+// ✓ Combinational logic uses = only
 always_comb begin
     temp   = a + b;
     result = temp * c;
 end
 ```
 
-## 2. 多重驅動
+## 2. Multiple drivers
 
 ```systemverilog
-// ❌ 兩個 always 驅動同一信號
+// ❌ Two always blocks driving the same signal
 always_ff @(posedge clk_i) data_q <= data_i;
-always_comb               data_q  = other_value;   // 衝突！
+always_comb               data_q  = other_value;   // conflict
 
-// ✓ 一處驅動
+// ✓ Single driver
 always_comb begin
     data_d = condition ? data_i : other_value;
 end
 always_ff @(posedge clk_i) data_q <= data_d;
 ```
 
-## 3. 不完整的敏感度列表
+## 3. Incomplete sensitivity list
 
 ```systemverilog
-// ❌ always @ 容易漏列敏感信號
-always @(a) result = a + b + c;     // 缺 b 和 c
+// ❌ always @ easily misses signals
+always @(a) result = a + b + c;     // b and c missing
 
-// ✓ 永遠用 always_comb（自動推斷）
+// ✓ Always use always_comb (auto-inferred)
 always_comb result = a + b + c;
 ```
 
-## 4. Latch 產生（最常見錯誤）
+## 4. Latch generation (most common defect)
 
 ```systemverilog
-// ❌ case 不完整 → out 變 latch
+// ❌ Incomplete case → out becomes a latch
 always_comb begin
     case (sel)
         2'b00: out = a;
         2'b01: out = b;
-        // 缺 2'b10, 2'b11
+        // 2'b10, 2'b11 missing
     endcase
 end
 
-// ✓ 加 default
+// ✓ Add default
 always_comb begin
     case (sel)
         2'b00:   out = a;
@@ -70,7 +68,7 @@ always_comb begin
     endcase
 end
 
-// ✓ 或全域預設
+// ✓ Or assign a global default first
 always_comb begin
     out = '0;       // default
     case (sel)
@@ -79,9 +77,9 @@ always_comb begin
     endcase
 end
 
-// ❌ if 沒有 else
+// ❌ if without else
 always_comb begin
-    if (en) out = data;     // !en 時 out 變 latch
+    if (en) out = data;     // !en path → latch
 end
 
 // ✓
@@ -91,50 +89,50 @@ always_comb begin
 end
 ```
 
-## 5. 位寬不匹配（隱式截斷）
+## 5. Width mismatch (implicit truncation)
 
 ```systemverilog
-// ❌ 隱式截斷
+// ❌ Implicit truncation
 logic [7:0]  byte_data;
 logic [15:0] word_data;
-assign byte_data = word_data;       // 高位被丟棄
+assign byte_data = word_data;       // upper bits silently dropped
 
-// ✓ 明確截斷
+// ✓ Explicit slice
 assign byte_data = word_data[7:0];
 
-// ✓ 明確擴展
+// ✓ Explicit extension
 assign word_data = {8'b0, byte_data};
 ```
 
-## 6. 在可綜合代碼用 `x` 或 `z`
+## 6. `x` or `z` in synthesizable code
 
 ```systemverilog
 // ❌
-assign data = 4'bxxxx;          // 綜合行為未定義
+assign data = 4'bxxxx;          // unsynthesizable
 
 // ✓
 assign data = 4'b0000;
 
-// 注意：x 只能用在 testbench
+// `x` is allowed only in testbench
 initial data = 4'bxxxx;         // testbench OK
 ```
 
-## 7. For 循環濫用（產生意外硬體）
+## 7. For-loop hardware abuse
 
 ```systemverilog
-// ❌ 在 always 中用 for
+// ❌ for inside always_ff
 integer i;
 always_ff @(posedge clk_i) begin
-    for (i = 0; i < 16; i++) data_o[i] <= data_i[i];    // 共享 counter 風險
+    for (i = 0; i < 16; i++) data_o[i] <= data_i[i];    // shared-counter risk
 end
 
-// ❌ 串聯邏輯
+// ❌ Cascaded combinational chain
 always_comb begin
     sum = '0;
-    for (i = 0; i < 16; i++) sum = sum + data[i];       // 16 級串聯
+    for (i = 0; i < 16; i++) sum = sum + data[i];       // 16-level chain
 end
 
-// ✓ 用 generate
+// ✓ Use generate
 genvar i;
 generate
     for (i = 0; i < 16; i++) begin : gen_regs
@@ -143,32 +141,32 @@ generate
 endgenerate
 ```
 
-詳見 `references/generate-vs-for.md`。
+See `references/generate-vs-for.md`.
 
-## 8. 手動 Clock Gating
+## 8. Manual clock gating
 
 ```systemverilog
-// ❌ 危險：手動 AND clock
+// ❌ Hand-AND'd clock
 assign gated_clk = clk_i & enable;
 always_ff @(posedge gated_clk) data_q <= data_d;
 
-// ❌ 用信號當 clock
+// ❌ Signal as clock
 always_ff @(posedge data_valid) counter <= counter + 1;
 
-// ✓ 用 enable 信號
+// ✓ Use enable
 always_ff @(posedge clk_i) begin
     if (enable) counter_q <= counter_q + 1'b1;
 end
 ```
 
-需要 clock gating 時，用 library 提供的 ICG cell（不要手動實現）。
+If clock gating is required, use the library's ICG cell. Never roll your own.
 
-## 9. 異步重置忘記放敏感度
+## 9. Async reset missing from sensitivity list
 
 ```systemverilog
-// ❌ 異步重置但沒在敏感度列表
+// ❌ Async reset declared but not in sensitivity list
 always_ff @(posedge clk_i) begin
-    if (!rst_ni) data_q <= '0;       // 變成同步重置（語意錯）
+    if (!rst_ni) data_q <= '0;       // becomes synchronous (semantic error)
     else         data_q <= data_d;
 end
 
@@ -179,43 +177,45 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
 end
 ```
 
-## 10. CDC 直接連接
+## 10. CDC without synchronizer
 
 ```systemverilog
-// ❌ 跨時鐘域直接傳遞 → 亞穩態
+// ❌ Direct cross-domain assignment → metastability
 always_ff @(posedge clk_a) sig_a <= ...;
-always_ff @(posedge clk_b) sig_b <= sig_a;      // 危險
+always_ff @(posedge clk_b) sig_b <= sig_a;      // unsafe
 
-// ✓ 雙級同步器
+// ✓ Two-FF synchronizer
 logic sync_1, sync_2;
 always_ff @(posedge clk_b) begin
     sync_1 <= sig_a;
     sync_2 <= sync_1;
 end
-// 使用 sync_2，不能用 sync_1
+// Use sync_2; never use sync_1
 ```
 
-## 11. 算術運算不擴展位寬
+For multi-bit CDC, use a proper handshake or async FIFO — a synchronizer alone is not sufficient.
+
+## 11. Arithmetic without width extension
 
 ```systemverilog
-// ❌ 結果可能溢位
+// ❌ Result truncates on overflow
 logic [7:0] a, b, sum;
-assign sum = a + b;         // 溢位被截斷
+assign sum = a + b;         // overflow silently dropped
 
-// ✓ 擴展
+// ✓ Extend
 logic [7:0] a, b;
 logic [8:0] sum;
 assign sum = {1'b0, a} + {1'b0, b};
 ```
 
-## 12. `always` 而非 `always_ff` / `always_comb`
+## 12. `always` instead of `always_ff` / `always_comb`
 
 ```systemverilog
-// ❌ 不明確（時序？組合？）
+// ❌ Ambiguous (sequential? combinational?)
 always @(posedge clk_i) data_q <= data_d;
 always @* result = a + b;
 
-// ✓ 明確
+// ✓ Explicit
 always_ff  @(posedge clk_i) data_q <= data_d;
 always_comb result = a + b;
 ```

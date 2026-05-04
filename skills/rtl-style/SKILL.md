@@ -5,22 +5,21 @@ description: SystemVerilog/Verilog RTL coding style guide and templates. Use whe
 
 # SystemVerilog RTL Style Guide
 
-本 skill 定義 SystemVerilog/Verilog RTL 的編碼標準。生成任何 RTL 代碼前必須遵循。
-
-完整規範主文件：`E:\03_Learning\rtl-forge\rtl_style.md`（v1.0，維護者 Lucas）
+This skill defines the SystemVerilog/Verilog RTL coding standard. Follow it before generating any RTL code. The skill itself is the authoritative source — `references/`, `templates/`, and `checklists/` together define every rule.
 
 ---
 
-## 強制規則（核心摘要 — 必須記住）
+## Mandatory rules (core summary)
 
-### 格式
-- **4 格空格縮排**，禁止使用 Tab
-- 每行 ≤ 100 字元
-- 運算子前後、逗號後必須有空格
+### Formatting
+- **4-space indent**, no tabs
+- Line length ≤ 100 characters
+- Whitespace around operators and after commas
 
-### 命名後綴（最常違反項）
-| 後綴 | 用途 | 範例 |
-|------|------|------|
+### Naming suffixes (most-violated rules)
+
+| Suffix | Use | Example |
+|--------|-----|---------|
 | `_i` | input port | `data_i`, `valid_i` |
 | `_o` | output port | `result_o`, `valid_o` |
 | `_q` | registered (FF output) | `state_q`, `counter_q` |
@@ -29,87 +28,90 @@ description: SystemVerilog/Verilog RTL coding style guide and templates. Use whe
 | `_e` | enum type | `state_e` |
 | `_t` | struct/typedef | `axi_req_t` |
 
-- Module / signal：小寫 + 底線（`axi_dma_controller`、`fetch_done`）
-- Parameter / localparam / `define：全大寫 + 底線（`ADDR_WIDTH`、`AXI4_RESP_OKAY`）
-- Pipeline stage：`s<N>_<signal>_q`（如 `s1_data_q`、`s2_valid_q`）
+- Modules / signals: lowercase + underscore (`axi_dma_controller`, `fetch_done`)
+- Parameter / localparam / `define`: UPPER_CASE + underscore (`ADDR_WIDTH`, `AXI4_RESP_OKAY`)
+- Pipeline stages: `s<N>_<signal>_q` (e.g. `s1_data_q`, `s2_valid_q`)
 
-### 時序邏輯（FF）
+### Sequential logic (FF)
 ```systemverilog
 always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
-        data_q <= '0;       // 重置必須有初始值
+        data_q  <= '0;       // every register reset to a known value
         state_q <= IDLE;
     end else begin
-        data_q <= data_d;   // 必須用非阻塞 <=
+        data_q  <= data_d;   // non-blocking <= only
         state_q <= state_d;
     end
 end
 ```
 
-### 組合邏輯
+### Combinational logic
 ```systemverilog
 always_comb begin
-    out = default_val;       // 所有輸出必須有預設值
-    state_d = state_q;       // 預設保持當前狀態
+    out      = default_val;  // every output has a default
+    state_d  = state_q;      // default: hold current state
     case (sel)
         2'b00:   out = a;
         2'b01:   out = b;
-        default: out = c;    // case 必須有 default（避免 latch）
+        default: out = c;    // case must have default (avoid latch)
     endcase
 end
 ```
 
-### 重複硬體：強制 `generate`，禁止 `for`
+### Repeated hardware: use `generate`, not `for`
 ```systemverilog
-// ✓ 正確
+// ✓ Correct
 genvar i;
 generate
     for (i = 0; i < N; i++) begin : gen_units
-        adder u_adder ( ... );  // 並行硬體實例
+        adder u_adder ( ... );  // parallel hardware instances
     end
 endgenerate
 
-// ❌ 錯誤：在 always 塊中用 for 產生硬體
+// ❌ Wrong: for inside always block produces cascaded logic
 always_comb begin
-    for (i = 0; i < N; i++) sum = sum + data[i];  // 串聯邏輯
+    for (i = 0; i < N; i++) sum = sum + data[i];
 end
 ```
-`for` 循環**僅**可用於 testbench / initial 初始化 / function 內簡單累加。
+`for` loops are restricted to testbench / `initial` / `function` bodies.
 
-### Pipeline 鐵則
-- 每級用 `s<N>_<signal>_q` 命名
-- valid **不能**依賴 ready（避免組合迴路）
-- Stall 時保持原值，flush 時清 valid 但保留資料
-- 詳見 `references/pipeline.md`
+### Pipeline rules
+- Name each stage `s<N>_<signal>_q`
+- `valid` must **not** depend on `ready` (would create a combinational loop)
+- Stall preserves data; flush clears `valid` while keeping data
+- See `references/pipeline.md`
 
-### 標準匯流排
-AXI/APB/AHB 介面定義放獨立 `.svh` 檔，用 `` `define `` 集中位寬與常數。詳見 `references/interfaces.md`。
-
----
-
-## 漸進式子檔載入
-
-**只在需要時讀取**對應子檔。不要一次載入所有檔案。
-
-| 任務情境 | 載入檔案 |
-|---------|---------|
-| 撰寫新模組（外殼/Port） | `references/module-structure.md` + `templates/module.sv` |
-| 命名規則細節 | `references/naming.md` |
-| 寫狀態機 | `references/fsm.md` + `templates/fsm.sv` |
-| 寫 Pipeline（含背壓） | `references/pipeline.md` + `templates/pipeline.sv` |
-| 處理重複硬體陣列 | `references/generate-vs-for.md` |
-| AXI / APB / AHB 介面 | `references/interfaces.md` + `templates/axi4_if.svh` |
-| 運算優化（CSA、移位、LZC、popcount） | `references/optimization.md` |
-| Debug 違規或檢查 | `references/forbidden-patterns.md` |
-| 完成代碼前最終檢查 | `checklists/pre-synthesis.md` |
+### Standard buses
+AXI/APB/AHB interfaces live in dedicated `.svh` headers; use `` `define `` to centralize widths and constants. See `references/interfaces.md`.
 
 ---
 
-## 工作流程（生成 RTL 時）
+## Progressive reference loading
 
-1. **先想清楚輸入/輸出/處理**：列出 Port 與資料流方向
-2. **複製對應 template**：從 `templates/` 取最接近的骨架
-3. **套用命名後綴**：`_i`/`_o`/`_q`/`_d`/`_n`
-4. **時序與組合分離**：`always_ff` 只放暫存器，`always_comb` 只放組合
-5. **加 default**：所有 `case` 與所有組合輸出
-6. **檢查清單**：完成後對照 `checklists/pre-synthesis.md`
+Load only the references needed for the task. Never preload everything.
+
+| Task | Files to load |
+|------|---------------|
+| New module (shell / ports) | `references/module-structure.md` + `templates/module.sv` |
+| Naming detail | `references/naming.md` |
+| File organization, directory layout | `references/file-organization.md` |
+| Clock / reset strategy, async-reset deassertion | `references/clock-reset.md` |
+| Comments, doc blocks, TODO/FIXME tags | `references/comments.md` |
+| FSM | `references/fsm.md` + `templates/fsm.sv` |
+| Pipeline (with backpressure) | `references/pipeline.md` + `templates/pipeline.sv` |
+| Repeated hardware arrays | `references/generate-vs-for.md` |
+| AXI / APB / AHB | `references/interfaces.md` + `templates/axi4_if.svh` |
+| Arithmetic optimization (CSA, shifts, LZC, popcount, divider FSM, TDM) | `references/optimization.md` |
+| Debug a violation | `references/forbidden-patterns.md` |
+| Final pre-synthesis check | `checklists/pre-synthesis.md` |
+
+---
+
+## Workflow when generating RTL
+
+1. **Plan inputs/outputs/processing** — list ports and dataflow direction.
+2. **Copy a template** — start from the closest `templates/` skeleton.
+3. **Apply naming suffixes** — `_i` / `_o` / `_q` / `_d` / `_n`.
+4. **Separate sequential and combinational** — `always_ff` for registers, `always_comb` for logic.
+5. **Add defaults** — every `case` and every combinational output.
+6. **Run the checklist** — verify against `checklists/pre-synthesis.md` before declaring done.
