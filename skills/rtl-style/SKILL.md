@@ -27,10 +27,20 @@ This skill defines the SystemVerilog/Verilog RTL coding standard. Follow it befo
 | `_n` | active-low | `rst_ni`, `cs_n`, `we_n` |
 | `_e` | enum type | `state_e` |
 | `_t` | struct/typedef | `axi_req_t` |
+| `_u` | union | `data_u` |
 
 - Modules / signals: lowercase + underscore (`axi_dma_controller`, `fetch_done`)
 - Parameter / localparam / `define`: UPPER_CASE + underscore (`ADDR_WIDTH`, `AXI4_RESP_OKAY`)
 - Pipeline stages: `s<N>_<signal>_q` (e.g. `s1_data_q`, `s2_valid_q`)
+
+### Clocks and resets
+
+- Clock naming: `clk_i` (single-clock) or `clk_<domain>_i` (multi-clock — e.g. `clk_sys_i`, `clk_cpu_i`)
+- Reset naming: `rst_ni` (active-low default), `arst_ni` (explicit async), `rst_<dom>_ni` per domain
+- **Synchronous reset is the default.** Use async reset only for critical control paths and the first FF in each domain that captures external/POR reset.
+- Async resets must release through a 2-FF synchronizer in **each** clock domain (synchronous deassertion). Never share a synchronized reset across domains.
+- Forbidden: manual clock gating (`clk_i & en`), signals as clocks. Use enable signals or library ICG cells instead.
+- Full strategy and synchronizer code: `references/clock-reset.md`.
 
 ### Sequential logic (FF)
 ```systemverilog

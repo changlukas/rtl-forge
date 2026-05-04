@@ -1,7 +1,7 @@
 // ============================================================================
 // Pipeline with Valid-Ready Backpressure Template
-// 三級 pipeline：input register → processing → output register
-// 支援 stall 與 flush
+// Three-stage pipeline: input register -> processing -> output register
+// Supports stall and flush
 // ============================================================================
 
 module pipeline_with_backpressure #(

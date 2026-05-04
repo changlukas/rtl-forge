@@ -176,8 +176,8 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
     end
 end
 
-assign data_o  = skid_valid_q ? skid_data_q  : data_q;
-assign valid_o = skid_valid_q ? skid_valid_q : valid_q;
+assign data_o  = skid_valid_q ? skid_data_q : data_q;
+assign valid_o = skid_valid_q || valid_q;
 assign ready_o = !skid_valid_q;
 ```
 

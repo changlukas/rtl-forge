@@ -32,12 +32,14 @@ always_comb begin
     state_d = state_q;          // default: stay in current state
 
     case (state_q)
-        IDLE:       if (start_i)       state_d = FETCH;
-        FETCH:      if (fetch_error)   state_d = ERROR;
-                    else if (fetch_done) state_d = EXECUTE;
-        EXECUTE:    if (exec_done)     state_d = WRITE_BACK;
-        WRITE_BACK: if (wb_done)       state_d = IDLE;
-        ERROR:      if (error_clear)   state_d = IDLE;
+        IDLE:       if (start_i)     state_d = FETCH;
+        FETCH: begin
+            if      (fetch_error)    state_d = ERROR;
+            else if (fetch_done)     state_d = EXECUTE;
+        end
+        EXECUTE:    if (exec_done)   state_d = WRITE_BACK;
+        WRITE_BACK: if (wb_done)     state_d = IDLE;
+        ERROR:      if (error_clear) state_d = IDLE;
         default:    state_d = IDLE;     // mandatory default
     endcase
 end

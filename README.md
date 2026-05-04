@@ -185,13 +185,21 @@ Once linked, Claude Code will auto-load `SKILL.md` whenever a session involves R
 
 ### As a Claude Code sub-agent (RTL review)
 
-Wire up the `rtl-reviewer` agent the same way:
+The `rtl-reviewer` agent is a single Markdown file. Two options:
 
-```
-cmd /c mklink /H "%USERPROFILE%\.claude\agents\rtl-reviewer.md" "<repo-path>\agents\rtl-reviewer.md"
-```
+1. **Symlink (recommended — works cross-volume).** Requires Windows 10/11 Developer Mode (Settings → For Developers → Developer Mode), or run the command as Administrator:
+   ```
+   cmd /c mklink "%USERPROFILE%\.claude\agents\rtl-reviewer.md" "<repo-path>\agents\rtl-reviewer.md"
+   ```
+   On Linux/macOS:
+   ```
+   ln -s <repo-path>/agents/rtl-reviewer.md ~/.claude/agents/rtl-reviewer.md
+   ```
 
-(Use `/H` for a single-file hardlink. Agents are single Markdown files.)
+2. **Hardlink (same volume only).** Fails silently across drive letters — if your repo is on `E:` and `%USERPROFILE%` is on `C:`, this will not work:
+   ```
+   cmd /c mklink /H "%USERPROFILE%\.claude\agents\rtl-reviewer.md" "<repo-path>\agents\rtl-reviewer.md"
+   ```
 
 Then invoke from any project: ask Claude to "review this RTL with the rtl-reviewer agent." The agent runs 12 detection passes over the supplied files and returns a CRITICAL / HIGH / MEDIUM / LOW report with file:line citations and minimal-change fix snippets.
 
